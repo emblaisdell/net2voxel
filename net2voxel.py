@@ -1,6 +1,7 @@
 # Eben Blaisdell 2020
 
-from PIL import Image
+from collections import defaultdict
+import copy
 
 class Vector:
     # x, y, z
@@ -34,6 +35,11 @@ class Vector:
             scalar * self.z
         )
 
+    def __eq__(self, other):
+        return self.x == other.x and \
+            self.y == other.y and \
+            self.z == other.z
+
     def __repr__(self):
         return "Vector(" + str(self.x) + ", " + str(self.y) + ", " + str(self.z) + ")"
 
@@ -48,6 +54,18 @@ class Vector:
     def rotatedAround(self, axis):
         """ Rotation of the vector about the axis by an angle of 90 degrees"""
         return Vector.cross(axis, self)
+
+    def tuple(self):
+        return (self.x, self.y, self.z)
+
+Vector.CARD_DIRECTIONS = [
+    Vector(1,0,0),
+    Vector(-1,0,0),
+    Vector(0,1,0),
+    Vector(0,-1,0),
+    Vector(0,0,1),
+    Vector(0,0,-1)
+]
 
 
 class Color:
@@ -79,13 +97,15 @@ class Color:
 
 class Voxel:
     # point
+    # boundaries
 
-    def __init__(self, point):
+    def __init__(self, point, boundaries=[]):
         self.point = point
+        self.boundaries = boundaries
 
 
 class VoxelBoundary:
-    # voxel
+    # voxel XXX: circular references?
     # normal
     # color XXX: maybe refactor to texture?
 
@@ -100,6 +120,21 @@ class NetPixel:
     def __init__(self, color, processed = False):
         self.color = color
         self.processed = processed
+
+
+class Box:
+    # corner (with minimal x,y,z coordinates), size as (l,w,h) vector
+    def __init__(self, corner, size):
+        self.corner = corner
+        self.size = size
+
+    def __contains__(self, vec):
+        minCorner = self.corner
+        maxCorner = self.corner + self.size
+
+        return vec.x in range(minCorner.x, maxCorner.x) and \
+            vec.y in range(minCorner.y, maxCorner.y) and \
+            vec.z in range(minCorner.z, maxCorner.z)
 
 def numRotationsByColor(color):
     maxChannel = max(color.r,color.g,color.b)
@@ -142,7 +177,7 @@ def voxelBoundariesFromNetImage(netImage):
     for i in range(netWidth):
         for j in range(netHeight):
             if netPixels[i][j].color.isSolid() and not netPixels[i][j].processed:
-                print("Processing Component")
+                print("Processing Voxel Boundary Component")
                 jobQueue.append(VoxelBoundaryProcessingJob(Vector(i, j)))
                 netPixels[i][j].processed = True
 
@@ -225,4 +260,82 @@ def voxelBoundariesFromNetImage(netImage):
                         moveDirection = moveDirection.rotatedAround(job.normal)
 
     return voxelBoundaries
+
+
+def voxelBoundaryBoundingBox(voxelBoundaries):
+    """ Take in array of voxel boundaries and return the bounding box of """
+
+    minCorner = copy.copy(voxelBoundaries[0].voxel.point)
+    maxCorner = copy.copy(voxelBoundaries[0].voxel.point)
+
+    for voxelBoundary in voxelBoundaries:
+        if voxelBoundary.voxel.point.x < minCorner.x:
+            minCorner.x = voxelBoundary.voxel.point.x
+        if voxelBoundary.voxel.point.x >= maxCorner.x:
+            maxCorner.x = voxelBoundary.voxel.point.x + 1
+        if voxelBoundary.voxel.point.y < minCorner.y:
+            minCorner.y = voxelBoundary.voxel.point.y
+        if voxelBoundary.voxel.point.y >= maxCorner.y:
+            maxCorner.y = voxelBoundary.voxel.point.y + 1
+        if voxelBoundary.voxel.point.z < minCorner.z:
+            minCorner.z = voxelBoundary.voxel.point.z
+        if voxelBoundary.voxel.point.z >= maxCorner.z:
+            maxCorner.z = voxelBoundary.voxel.point.z + 1
+
+    return Box(minCorner, maxCorner - minCorner)
+
+
+def voxelsFromVoxelBoundaries(voxelBoundaries):
+    """ Take in the boundary of a voxel model, as an array of voxel boundaries
+        and return the voxel model as an array of voxels """
+
+    voxels = []
+
+    bbox = voxelBoundaryBoundingBox(voxelBoundaries)
+
+    print("Bounding Box", bbox.corner, bbox.size)
+
+    size = bbox.size
+
+    hasBeenProcessed = [[[False for z in range(size.z)] for y in range(size.y)] for x in range(size.x)]
+
+    voxelBoundariesByLocation = defaultdict(lambda:[])
+    for voxelBoundary in voxelBoundaries:
+        voxelBoundariesByLocation[voxelBoundary.voxel.point.tuple()].append(voxelBoundary)
+
+    positionQueue = []
+
+    for voxelBoundary in voxelBoundaries:
+        point = voxelBoundary.voxel.point
+        if not hasBeenProcessed[point.x][point.y][point.z]:
+            print("Processing Voxel Component")
+            hasBeenProcessed[point.x][point.y][point.z] = True
+            positionQueue.append(point)
+
+            while len(positionQueue) > 0:
+                jobPoint = positionQueue.pop()
+
+                boundaries = voxelBoundariesByLocation[jobPoint.tuple()]
+
+                newVoxel = Voxel(jobPoint, boundaries)
+                for boundary in boundaries:
+                    boundary.voxel = newVoxel
+                voxels.append(newVoxel)
+
+                for direction in Vector.CARD_DIRECTIONS:
+                    isBoundaryDirection = False
+                    for boundary in boundaries:
+                        if boundary.normal == direction:
+                            isBoundaryDirection = True
+                            break
+
+                    if not isBoundaryDirection:
+                        newPoint = jobPoint + direction
+                        if not (newPoint in bbox):
+                            raise Exception("Voxel Boundaries are not manifold!")
+                        if not hasBeenProcessed[newPoint.x][newPoint.y][newPoint.z]:
+                            hasBeenProcessed[newPoint.x][newPoint.y][newPoint.z] = True
+                            positionQueue.append(newPoint)
+
+    return voxels
 
