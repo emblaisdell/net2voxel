@@ -126,6 +126,8 @@ class VoxelBoundaryProcessingJob:
         self.forward = forward
 
 def voxelBoundariesFromNetImage(netImage):
+    """ Take in PIL image and return array of colored voxel boundaries """
+
     netWidth = netImage.width
     netHeight = netImage.height
 
@@ -224,4 +226,3 @@ def voxelBoundariesFromNetImage(netImage):
 
     return voxelBoundaries
 
-    netImage.show()
