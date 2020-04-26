@@ -1,6 +1,6 @@
 # Eben Blaisdell 2020
 
-from collections import defaultdict
+from collections import defaultdict, Set
 import copy
 
 class Vector:
@@ -66,6 +66,11 @@ Vector.CARD_DIRECTIONS = [
     Vector(0,0,1),
     Vector(0,0,-1)
 ]
+Vector.POS_DIRECTIONS = [
+    Vector(1,0,0),
+    Vector(0,1,0),
+    Vector(0,0,1)
+]
 
 
 class Color:
@@ -95,6 +100,7 @@ class Color:
     def normedRgbTuple(self):
         return (self.r / 255, self.g / 255, self.b / 255)
 
+
 class Voxel:
     # point
     # boundaries
@@ -113,6 +119,7 @@ class VoxelBoundary:
         self.voxel = voxel
         self.normal = normal
         self.color = color
+
 
 class NetPixel:
     # color
@@ -136,6 +143,22 @@ class Box:
             vec.y in range(minCorner.y, maxCorner.y) and \
             vec.z in range(minCorner.z, maxCorner.z)
 
+    def __iter__(self):
+        def boxIterator():
+            for x in range(self.corner.x, self.corner.x + self.size.x):
+                for y in range(self.corner.y, self.corner.y + self.size.y):
+                    for z in range(self.corner.z, self.corner.z + self.size.z):
+                        yield Vector(x, y, z)
+        return boxIterator()
+
+
+class TexturedBox:
+    # box, textures
+    def __init__(self, box, textures):
+        self.box = box
+        self.textures = textures
+
+
 def numRotationsByColor(color):
     maxChannel = max(color.r,color.g,color.b)
     if maxChannel == color.r:
@@ -145,6 +168,7 @@ def numRotationsByColor(color):
     if maxChannel == color.b:
         return 1
     return 0
+
 
 class VoxelBoundaryProcessingJob:
     def __init__(self,
@@ -159,6 +183,7 @@ class VoxelBoundaryProcessingJob:
         self.position = position
         self.normal = normal
         self.forward = forward
+
 
 def voxelBoundariesFromNetImage(netImage):
     """ Take in PIL image and return array of colored voxel boundaries """
@@ -338,4 +363,58 @@ def voxelsFromVoxelBoundaries(voxelBoundaries):
                             positionQueue.append(newPoint)
 
     return voxels
+
+class VoxelFillingJob:
+    # voxel, filled
+    def __init__(self, voxel, filled=False):
+        self.voxel = voxel
+        self.filled = filled
+
+def boxFillVoxels(voxels):
+    """ Take in a list of voxels and find large boxes partitioning the model """
+
+    texturedBoxes = []
+
+    voxels = sorted(voxels, key=lambda v: v.point.x + v.point.y + v.point.z)
+
+    voxelJobs = [VoxelFillingJob(voxel) for voxel in voxels]
+
+    voxelJobsByLocation = {}
+    for voxelJob in voxelJobs:
+        voxelJobsByLocation[voxelJob.voxel.point.tuple()] = voxelJob
+
+    for voxelJob in voxelJobs:
+        if voxelJob.filled:
+            continue
+
+        print("Adding Cube")
+
+        voxel = voxelJob.voxel
+
+        box = Box(voxel.point, Vector(1, 1, 1))
+
+        for direction in Vector.POS_DIRECTIONS:
+            while True:
+                box.size += direction
+
+                boxIsContainedInVoxels = True
+                for point in box:
+                    if not (point.tuple() in voxelJobsByLocation) or \
+                            voxelJobsByLocation[point.tuple()].filled:
+                        boxIsContainedInVoxels = False
+                        break
+
+                if not boxIsContainedInVoxels:
+                    box.size -= direction
+                    break
+
+        for point in box:
+            voxelJobsByLocation[point.tuple()].filled = True
+
+        texturedBox = TexturedBox(box, [])
+
+        texturedBoxes.append(texturedBox)
+
+    return texturedBoxes
+
 

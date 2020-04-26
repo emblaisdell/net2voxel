@@ -4,7 +4,7 @@ from PIL import Image
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 
-from net2voxel import Vector, voxelBoundariesFromNetImage, voxelsFromVoxelBoundaries
+from net2voxel import Vector, voxelBoundariesFromNetImage, voxelsFromVoxelBoundaries, boxFillVoxels
 
 def main():
     net = Image.open("./images/creeper_net.png")
@@ -18,6 +18,10 @@ def main():
     voxels = voxelsFromVoxelBoundaries(voxelBoundaries)
 
     print("Model contains", len(voxels), "voxels")
+
+    boxes = boxFillVoxels(voxels)
+
+    print("Filled with", len(boxes), "boxes")
 
 def printVoxelBoundaries(voxelBoundaries):
     fig = plt.figure()
