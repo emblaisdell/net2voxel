@@ -5,3 +5,7 @@ __pycache__
 images
 
 *.scad
+
+stl
+
+*.stl

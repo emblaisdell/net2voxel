@@ -3,9 +3,10 @@
 from PIL import Image
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
+from solid import *
 
 from net2voxel import Vector, voxelBoundariesFromNetImage, voxelsFromVoxelBoundaries, boxFillVoxels
-from texturer import scadFromTexturedBoxes
+from texturer import texturedModel
 
 def main():
     net = Image.open("./images/creeper_net.png")
@@ -24,9 +25,12 @@ def main():
 
     print("Filled with", len(boxes), "boxes")
 
-    scadFromTexturedBoxes(boxes, "out.scad")
+    obj = texturedModel(boxes, voxelBoundaries, grayscaleValue)
 
+    scad_render_to_file(obj, "out.scad")
 
+def grayscaleValue(color):
+    return (color.r + color.g + color.b) / (3*255.0) - 0.5
 
 def printVoxelBoundaries(voxelBoundaries):
     fig = plt.figure()

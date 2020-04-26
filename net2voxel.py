@@ -1,5 +1,6 @@
 # Eben Blaisdell 2020
 
+from PIL import Image
 from collections import defaultdict, Set
 import copy
 
@@ -150,13 +151,6 @@ class Box:
                     for z in range(self.corner.z, self.corner.z + self.size.z):
                         yield Vector(x, y, z)
         return boxIterator()
-
-
-class TexturedBox:
-    # box, textures
-    def __init__(self, box, textures):
-        self.box = box
-        self.textures = textures
 
 
 def numRotationsByColor(color):
@@ -364,6 +358,7 @@ def voxelsFromVoxelBoundaries(voxelBoundaries):
 
     return voxels
 
+
 class VoxelFillingJob:
     # voxel, filled
     def __init__(self, voxel, filled=False):
@@ -373,7 +368,7 @@ class VoxelFillingJob:
 def boxFillVoxels(voxels):
     """ Take in a list of voxels and find large boxes partitioning the model """
 
-    texturedBoxes = []
+    boxes = []
 
     voxels = sorted(voxels, key=lambda v: v.point.x + v.point.y + v.point.z)
 
@@ -411,10 +406,8 @@ def boxFillVoxels(voxels):
         for point in box:
             voxelJobsByLocation[point.tuple()].filled = True
 
-        texturedBox = TexturedBox(box, [])
+        boxes.append(box)
 
-        texturedBoxes.append(texturedBox)
-
-    return texturedBoxes
+    return boxes
 
 
