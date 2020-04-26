@@ -5,6 +5,7 @@ from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 
 from net2voxel import Vector, voxelBoundariesFromNetImage, voxelsFromVoxelBoundaries, boxFillVoxels
+from texturer import scadFromTexturedBoxes
 
 def main():
     net = Image.open("./images/creeper_net.png")
@@ -22,6 +23,10 @@ def main():
     boxes = boxFillVoxels(voxels)
 
     print("Filled with", len(boxes), "boxes")
+
+    scadFromTexturedBoxes(boxes, "out.scad")
+
+
 
 def printVoxelBoundaries(voxelBoundaries):
     fig = plt.figure()
